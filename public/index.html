@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI-powered bug report enhancer with Jira integration">
+  <title>Bug Report Enhancer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <!-- ─── Main Page ─────────────────────────────────────────────────── -->
+  <div class="app-container" id="mainPage">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <h1>Bug Report Enhancer</h1>
+      </div>
+      <button class="btn btn-settings" id="btnOpenSettings" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+        <span>Settings</span>
+      </button>
+    </header>
+
+    <main class="main-content">
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-content" id="dropZoneContent">
+          <div class="drop-icon">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <h2>Drag & Drop Screenshot</h2>
+          <p>or <label for="fileInput" class="file-browse">browse files</label></p>
+          <p class="file-hint">Supports PNG, JPEG, GIF, WebP (max 10MB)</p>
+          <input type="file" id="fileInput" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+        </div>
+        <!-- Preview shown after upload -->
+        <div class="preview-container" id="previewContainer" style="display:none;">
+          <img id="previewImage" alt="Screenshot preview">
+          <button class="btn btn-remove" id="btnRemoveFile" title="Remove file">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <div class="preview-filename" id="previewFilename"></div>
+        </div>
+      </div>
+
+      <!-- Additional Notes -->
+      <div class="notes-section">
+        <label for="additionalNotes" class="section-label">Additional Notes</label>
+        <textarea id="additionalNotes"
+          placeholder="Add any context, steps to reproduce, or observations about the bug..." rows="3"></textarea>
+      </div>
+
+      <!-- Analyze Button -->
+      <button class="btn btn-primary btn-analyze" id="btnAnalyze" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <span>Analyze & Push to Jira</span>
+      </button>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="loadingState" style="display:none;">
+        <div class="spinner"></div>
+        <p id="loadingText">Analyzing screenshot with AI...</p>
+      </div>
+
+      <!-- Results Section -->
+      <div class="results-section" id="resultsSection" style="display:none;">
+        <div class="results-header">
+          <h2>AI Analysis Result</h2>
+          <div class="results-actions">
+            <button class="btn btn-success" id="btnPushJira">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 2L11 13" />
+                <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+              <span>Push to Jira</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="result-cards">
+          <div class="result-card">
+            <div class="result-label">Title</div>
+            <div class="result-value" id="resultTitle">—</div>
+          </div>
+          <div class="result-card">
+            <div class="result-label">Severity</div>
+            <div class="result-value"><span class="severity-badge" id="resultSeverity">—</span></div>
+          </div>
+          <div class="result-card full-width">
+            <div class="result-label">Description</div>
+            <div class="result-value" id="resultDescription">—</div>
+          </div>
+          <div class="result-card">
+            <div class="result-label">Steps to Reproduce</div>
+            <ol class="result-value result-steps" id="resultSteps"></ol>
+          </div>
+          <div class="result-card">
+            <div class="result-label">Expected Behavior</div>
+            <div class="result-value" id="resultExpected">—</div>
+          </div>
+          <div class="result-card">
+            <div class="result-label">Actual Behavior</div>
+            <div class="result-value" id="resultActual">—</div>
+          </div>
+          <div class="result-card full-width">
+            <div class="result-label">Environment</div>
+            <div class="result-value" id="resultEnvironment">—</div>
+          </div>
+          <div class="result-card full-width">
+            <div class="result-label">Additional Info</div>
+            <div class="result-value" id="resultAdditional">—</div>
+          </div>
+        </div>
+
+        <!-- Jira Success -->
+        <div class="jira-success" id="jiraSuccess" style="display:none;">
+          <div class="jira-success-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+          <div>
+            <strong id="jiraIssueKey">—</strong>
+            <a id="jiraIssueLink" href="#" target="_blank">Open in Jira →</a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ─── Settings Modal ─────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="settingsModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="btn btn-icon" id="btnCloseSettings" title="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Jira Section -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="section-number">1</div>
+            <h3>Jira Connection Details</h3>
+          </div>
+          <div class="form-group">
+            <label for="jiraUrl">Jira URL</label>
+            <input type="url" id="jiraUrl" placeholder="https://your-domain.atlassian.net">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="jiraProject">Project Key</label>
+              <input type="text" id="jiraProject" placeholder="e.g. BUG">
+            </div>
+            <div class="form-group">
+              <label for="jiraIssueType">Issue Type</label>
+              <input type="text" id="jiraIssueType" value="Bug" placeholder="Bug">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="jiraEmail">Email</label>
+            <input type="email" id="jiraEmail" placeholder="your-email@company.com">
+          </div>
+          <div class="form-group">
+            <label for="jiraApiKey">API Token</label>
+            <input type="password" id="jiraApiKey" placeholder="Your Jira API token">
+          </div>
+          <button class="btn btn-outline btn-test" id="btnTestJira">
+            <span class="btn-test-text">Test Jira Connection</span>
+            <span class="btn-test-spinner" style="display:none;"><span class="spinner-small"></span></span>
+          </button>
+          <div class="test-result" id="jiraTestResult"></div>
+        </div>
+
+        <!-- Groq Section -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="section-number">2</div>
+            <h3>Groq API Key</h3>
+          </div>
+          <p class="settings-hint">Using Llama 4 Scout (free tier) on Groq for screenshot analysis</p>
+          <div class="form-group">
+            <label for="groqApiKey">API Key</label>
+            <input type="password" id="groqApiKey" placeholder="gsk_...">
+          </div>
+          <button class="btn btn-outline btn-test" id="btnTestGroq">
+            <span class="btn-test-text">Test Groq Connection</span>
+            <span class="btn-test-spinner" style="display:none;"><span class="spinner-small"></span></span>
+          </button>
+          <div class="test-result" id="groqTestResult"></div>
+        </div>
+
+        <!-- HMIS 3.0 Custom Fields Section -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="section-number">3</div>
+            <h3>HMIS 3.0 Custom Fields</h3>
+          </div>
+          <p class="settings-hint">Required fields for your Jira project. Set default values below.</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="hmisDefectType">Defect Type</label>
+              <input type="text" id="hmisDefectType" value="Functional" placeholder="e.g. Functional">
+            </div>
+            <div class="form-group">
+              <label for="hmisPlatformDevice">Platform & Device Type</label>
+              <input type="text" id="hmisPlatformDevice" value="Web" placeholder="e.g. Web">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="hmisBugRaisedTeam">Bug Raised Team</label>
+              <input type="text" id="hmisBugRaisedTeam" value="Manual" placeholder="e.g. Manual">
+            </div>
+            <div class="form-group">
+              <label for="hmisSourceOfBug">Source of Bug</label>
+              <input type="text" id="hmisSourceOfBug" value="Internal" placeholder="e.g. Internal">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="hmisSeverity">Severity for HMIS 3.0</label>
+              <input type="text" id="hmisSeverity" value="" placeholder="e.g. Major">
+            </div>
+            <div class="form-group">
+              <label for="hmisPriority">Priority for HMIS 3.0</label>
+              <input type="text" id="hmisPriority" value="" placeholder="e.g. High">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="hmisPhase">Phase</label>
+              <input type="text" id="hmisPhase" value="QA" placeholder="e.g. QA">
+            </div>
+            <div class="form-group">
+              <label for="hmisSubPhase">Sub-Phase</label>
+              <input type="text" id="hmisSubPhase" value="Testing" placeholder="e.g. Testing">
+            </div>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label for="hmisBuildVersion">Build Version</label>
+            <input type="text" id="hmisBuildVersion" value="3.0.01" placeholder="e.g. 3.0.01">
+          </div>
+
+          <div class="form-group">
+            <label for="hmisAssignee">Assignee</label>
+            <select id="hmisAssignee">
+              <option value="">-- Load Settings to fetch --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="hmisLinkedIssue">Link Issue (Relates to)</label>
+            <select id="hmisLinkedIssue">
+              <option value="">-- Load Settings to fetch --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="hmisModuleParent">Module</label>
+            <select id="hmisModuleParent">
+              <option value="">-- Load Settings to fetch --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="hmisModuleChild">Sub-Module</label>
+            <select id="hmisModuleChild">
+              <option value="">-- Select Module First --</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelSettings">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveSettings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          <span>Save Settings</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <span class="toast-icon" id="toastIcon"></span>
+    <span class="toast-text" id="toastText"></span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

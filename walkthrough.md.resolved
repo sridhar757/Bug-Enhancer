@@ -1,0 +1,51 @@
+# Bug Report Enhancer — Walkthrough
+
+## What Was Built
+
+A full-stack **Bug Report Enhancer** tool matching your wireframes:
+
+| Component | Tech | File |
+|---|---|---|
+| Backend | Express + TypeScript | [server.ts](file:///d:/New%20folder/Antigravity%20Sample/server.ts) |
+| Frontend UI | HTML5 | [index.html](file:///d:/New%20folder/Antigravity%20Sample/public/index.html) |
+| Styles | CSS (dark theme) | [style.css](file:///d:/New%20folder/Antigravity%20Sample/public/style.css) |
+| Frontend Logic | TypeScript | [app.ts](file:///d:/New%20folder/Antigravity%20Sample/public/app.ts) |
+
+### Key Features
+- **Drag & Drop** screenshot upload with preview
+- **Groq AI Analysis** using **Llama 4 Scout** (free tier) to auto-generate structured bug reports
+- **Jira Integration** — creates issues with title, description, steps, severity, expected/actual behavior
+- **Settings Modal** with separate **Test Connection** buttons for both Jira and Groq
+- Premium dark theme with glassmorphism, gradients, and micro-animations
+
+---
+
+## Verification
+
+App verified running at `http://localhost:3000` in Chrome:
+
+![Main Page](file:///C:/Users/2895/.gemini/antigravity/brain/f07f6b0e-c770-4692-af44-56ddca1b3ce9/.system_generated/click_feedback/click_feedback_1771867024177.png)
+
+✅ Header with "Bug Report Enhancer" title and Settings button  
+✅ Drag & Drop zone with browse files link  
+✅ Additional Notes textarea  
+✅ "Analyze & Push to Jira" button (disabled until file uploaded)  
+✅ Settings modal with Jira + Groq sections and test buttons  
+
+---
+
+## How to Run
+
+```bash
+# From project directory
+npm install
+npx tsc --outDir public --target ES2020 --module ES2020 --moduleResolution node --skipLibCheck --lib ES2020,DOM public/app.ts
+npx ts-node server.ts
+# Open http://localhost:3000 in Chrome
+```
+
+## Next Steps (Manual by User)
+1. Open Settings → enter your **Groq API key** → click "Test Groq Connection"
+2. Enter **Jira** URL, Project, Email, API Token → click "Test Jira Connection"
+3. Save Settings
+4. Upload a bug screenshot → click "Analyze & Push to Jira"
