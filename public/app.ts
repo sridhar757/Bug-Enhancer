@@ -178,8 +178,10 @@ btnAnalyze.addEventListener('click', async () => {
     const formData = new FormData();
     formData.append('screenshot', selectedFile);
     formData.append('notes', additionalNotes.value);
+    formData.append('config', JSON.stringify(getSavedConfig())); // Send config to Vercel backend
 
     try {
+
         const response = await fetch('/api/analyze', {
             method: 'POST',
             body: formData
@@ -245,10 +247,14 @@ btnPushJira.addEventListener('click', async () => {
     btnPushJira.querySelector('span')!.textContent = 'Pushing...';
 
     try {
+        const payload = {
+            bugReport: currentBugReport,
+            config: getSavedConfig() // Send config to Vercel backend
+        };
         const response = await fetch('/api/push-to-jira', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bugReport: currentBugReport })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
@@ -270,13 +276,19 @@ btnPushJira.addEventListener('click', async () => {
     }
 });
 
-// ─── Settings Modal ──────────────────────────────────────────────────────────
+// Helper to get saved config from localStorage
+function getSavedConfig() {
+    try {
+        const saved = localStorage.getItem('bugEnhancerConfig');
+        if (saved) return JSON.parse(saved);
+    } catch (e) { console.error("Could not parse config", e); }
+    return {};
+}
 
 btnOpenSettings.addEventListener('click', async () => {
-    // Load current settings
+    // Load current settings from localStorage
     try {
-        const response = await fetch('/api/settings');
-        const data = await response.json();
+        const data = getSavedConfig();
         jiraUrlInput.value = data.jira?.url || '';
         jiraProjectInput.value = data.jira?.project || '';
         jiraIssueTypeInput.value = data.jira?.issueType || 'Bug';
@@ -308,7 +320,11 @@ btnOpenSettings.addEventListener('click', async () => {
             hmisLinkedIssueInput.innerHTML = '<option value="">-- Loading issues... --</option>';
             hmisModuleParentInput.innerHTML = '<option value="">-- Loading modules... --</option>';
 
-            fetch('/api/dynamic-options').then(r => r.json()).then(dyn => {
+            fetch('/api/dynamic-options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: data })
+            }).then(r => r.json()).then(dyn => {
                 if (dyn.success) {
                     // Populate Assignees
                     hmisAssigneeInput.innerHTML = '<option value="">Unassigned</option>';
@@ -418,23 +434,12 @@ function getSettingsPayload() {
 }
 
 // Save Settings
-btnSaveSettings.addEventListener('click', async () => {
+btnSaveSettings.addEventListener('click', () => {
     const settings = getSettingsPayload();
-
     try {
-        const response = await fetch('/api/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            showToast('Settings saved successfully');
-            closeSettings();
-        } else {
-            showToast('Failed to save settings', 'error');
-        }
+        localStorage.setItem('bugEnhancerConfig', JSON.stringify(settings));
+        showToast('Settings saved successfully');
+        closeSettings();
     } catch {
         showToast('Failed to save settings', 'error');
     }
@@ -448,17 +453,16 @@ btnTestJira.addEventListener('click', async () => {
     btnSpinner.style.display = '';
     btnTestJira.disabled = true;
 
-    // Save first so we test the latest values
+    // Save first to localStorage so we test the latest values
     const settings = getSettingsPayload();
+    localStorage.setItem('bugEnhancerConfig', JSON.stringify(settings));
 
     try {
-        await fetch('/api/settings', {
+        const response = await fetch('/api/test-connection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
+            body: JSON.stringify({ config: settings })
         });
-
-        const response = await fetch('/api/test-connection', { method: 'POST' });
         const data = await response.json();
 
         jiraTestResult.textContent = data.message;
@@ -483,17 +487,16 @@ btnTestGroq.addEventListener('click', async () => {
     btnSpinner.style.display = '';
     btnTestGroq.disabled = true;
 
-    // Save first
+    // Save first to localStorage
     const settings = getSettingsPayload();
+    localStorage.setItem('bugEnhancerConfig', JSON.stringify(settings));
 
     try {
-        await fetch('/api/settings', {
+        const response = await fetch('/api/test-groq', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
+            body: JSON.stringify({ config: settings })
         });
-
-        const response = await fetch('/api/test-groq', { method: 'POST' });
         const data = await response.json();
 
         groqTestResult.textContent = data.message;

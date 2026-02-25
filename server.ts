@@ -2,12 +2,10 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import cors from 'cors';
 import axios from 'axios';
-import fs from 'fs';
 import path from 'path';
 
 const app = express();
-const PORT = 3000;
-const CONFIG_PATH = path.join(__dirname, 'config.json');
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -61,99 +59,12 @@ interface AppConfig {
     };
 }
 
-function loadConfig(): AppConfig {
-    const defaults: AppConfig = {
-        jira: {
-            url: '', project: '', apiKey: '', email: '', issueType: 'Bug',
-            hmisFields: {
-                defectType: 'Functional', platformDevice: 'Web', bugRaisedTeam: 'Manual',
-                sourceOfBug: 'Internal', severity: '', priority: '', buildVersion: '3.0.01',
-                phase: 'QA', subPhase: 'Testing', assignee: '', linkedIssue: '', moduleParent: '', moduleChild: ''
-            }
-        },
-        groq: { apiKey: '' }
-    };
-    try {
-        if (fs.existsSync(CONFIG_PATH)) {
-            const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-            return { ...defaults, ...JSON.parse(raw) };
-        }
-    } catch (e) {
-        console.error('Error loading config:', e);
-    }
-    return defaults;
-}
-
-function saveConfig(config: AppConfig): void {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-}
-
 // ─── API Routes ──────────────────────────────────────────────────────────────
 
-// GET /api/settings — return current settings (mask API keys)
-app.get('/api/settings', (_req: Request, res: Response) => {
-    const config = loadConfig();
-    res.json({
-        jira: {
-            url: config.jira.url,
-            project: config.jira.project,
-            apiKey: config.jira.apiKey ? '••••' + config.jira.apiKey.slice(-4) : '',
-            email: config.jira.email,
-            issueType: config.jira.issueType,
-            hmisFields: config.jira.hmisFields
-        },
-        groq: {
-            apiKey: config.groq.apiKey ? '••••' + config.groq.apiKey.slice(-4) : ''
-        }
-    });
-});
-
-// POST /api/settings — save settings
-app.post('/api/settings', (req: Request, res: Response) => {
-    const current = loadConfig();
-    const body = req.body;
-
-    const currentHmis = current.jira.hmisFields || {} as HmisCustomFields;
-    const bodyHmis = body.jira?.hmisFields || {};
-
-    const updated: AppConfig = {
-        jira: {
-            url: body.jira?.url ?? current.jira.url,
-            project: body.jira?.project ?? current.jira.project,
-            apiKey: body.jira?.apiKey && !body.jira.apiKey.startsWith('••••')
-                ? body.jira.apiKey : current.jira.apiKey,
-            email: body.jira?.email ?? current.jira.email,
-            issueType: body.jira?.issueType ?? current.jira.issueType,
-            hmisFields: {
-                defectType: bodyHmis.defectType ?? currentHmis.defectType ?? '',
-                platformDevice: bodyHmis.platformDevice ?? currentHmis.platformDevice ?? '',
-                bugRaisedTeam: bodyHmis.bugRaisedTeam ?? currentHmis.bugRaisedTeam ?? '',
-                sourceOfBug: bodyHmis.sourceOfBug ?? currentHmis.sourceOfBug ?? '',
-                severity: bodyHmis.severity ?? currentHmis.severity ?? '',
-                priority: bodyHmis.priority ?? currentHmis.priority ?? '',
-                buildVersion: bodyHmis.buildVersion ?? currentHmis.buildVersion ?? '',
-                phase: bodyHmis.phase ?? currentHmis.phase ?? '',
-                subPhase: bodyHmis.subPhase ?? currentHmis.subPhase ?? '',
-                assignee: bodyHmis.assignee ?? currentHmis.assignee ?? '',
-                linkedIssue: bodyHmis.linkedIssue ?? currentHmis.linkedIssue ?? '',
-                moduleParent: bodyHmis.moduleParent ?? currentHmis.moduleParent ?? '',
-                moduleChild: bodyHmis.moduleChild ?? currentHmis.moduleChild ?? ''
-            }
-        },
-        groq: {
-            apiKey: body.groq?.apiKey && !body.groq.apiKey.startsWith('••••')
-                ? body.groq.apiKey : current.groq.apiKey
-        }
-    };
-
-    saveConfig(updated);
-    res.json({ success: true, message: 'Settings saved successfully' });
-});
-
 // POST /api/test-connection — test Jira connectivity
-app.post('/api/test-connection', async (_req: Request, res: Response) => {
-    const config = loadConfig();
-    if (!config.jira.url || !config.jira.apiKey || !config.jira.email) {
+app.post('/api/test-connection', async (req: Request, res: Response) => {
+    const config = req.body.config;
+    if (!config?.jira?.url || !config?.jira?.apiKey || !config?.jira?.email) {
         res.status(400).json({ success: false, message: 'Jira settings are incomplete' });
         return;
     }
@@ -176,9 +87,9 @@ app.post('/api/test-connection', async (_req: Request, res: Response) => {
 });
 
 // POST /api/test-groq — test Groq API connectivity
-app.post('/api/test-groq', async (_req: Request, res: Response) => {
-    const config = loadConfig();
-    if (!config.groq.apiKey) {
+app.post('/api/test-groq', async (req: Request, res: Response) => {
+    const config = req.body.config;
+    if (!config?.groq?.apiKey) {
         res.status(400).json({ success: false, message: 'Groq API key is not configured' });
         return;
     }
@@ -208,8 +119,14 @@ app.post('/api/analyze', upload.single('screenshot'), async (req: Request, res: 
         return;
     }
 
-    const config = loadConfig();
-    if (!config.groq.apiKey) {
+    let config: any = {};
+    try {
+        if (req.body.config) config = JSON.parse(req.body.config);
+    } catch (e) {
+        console.error("Failed to parse config from FormData", e);
+    }
+
+    if (!config?.groq?.apiKey) {
         res.status(400).json({ success: false, message: 'Groq API key is not configured. Please update Settings.' });
         return;
     }
@@ -302,104 +219,10 @@ app.post('/api/analyze', upload.single('screenshot'), async (req: Request, res: 
     }
 });
 
-// GET /api/field-options — fetch allowed values for HMIS custom fields from Jira
-app.get('/api/field-options', async (_req: Request, res: Response) => {
-    const config = loadConfig();
-    if (!config.jira.url || !config.jira.apiKey || !config.jira.email || !config.jira.project) {
-        res.status(400).json({ success: false, message: 'Jira settings are incomplete' });
-        return;
-    }
-
-    const authHeader = `Basic ${Buffer.from(`${config.jira.email}:${config.jira.apiKey}`).toString('base64')}`;
-    const headers = { 'Authorization': authHeader, 'Content-Type': 'application/json' };
-
-    // Custom field IDs we need options for
-    const fieldIds = [
-        'customfield_10313', // Defect Type
-        'customfield_10368', // Platform & Device Type
-        'customfield_10326', // Bug Raised Team
-        'customfield_10315', // Source of Bug
-        'customfield_10305', // Severity
-        'customfield_10306', // Priority
-        'customfield_10319', // Build Version
-        'customfield_10470', // Phase
-        'customfield_10471', // Sub-Phase
-    ];
-
-    const fieldOptions: Record<string, string[]> = {};
-
-    try {
-        // Use createmeta to get field options for this project/issue type
-        const metaResponse = await axios.get(
-            `${config.jira.url}/rest/api/3/issue/createmeta/${config.jira.project}/issuetypes`,
-            { headers }
-        );
-
-        // Find the correct issue type
-        const issueTypeName = config.jira.issueType || 'Bug';
-        const issueType = metaResponse.data?.issueTypes?.find(
-            (it: any) => it.name.toLowerCase() === issueTypeName.toLowerCase()
-        ) || metaResponse.data?.values?.find(
-            (it: any) => it.name.toLowerCase() === issueTypeName.toLowerCase()
-        );
-
-        if (issueType) {
-            // Fetch fields for this issue type
-            const fieldsResponse = await axios.get(
-                `${config.jira.url}/rest/api/3/issue/createmeta/${config.jira.project}/issuetypes/${issueType.id}`,
-                { headers }
-            );
-
-            const fields = fieldsResponse.data?.fields || fieldsResponse.data?.values || [];
-
-            // Extract allowed values for each custom field
-            for (const fieldId of fieldIds) {
-                const field = Array.isArray(fields)
-                    ? fields.find((f: any) => f.fieldId === fieldId)
-                    : fields[fieldId];
-
-                if (field) {
-                    const allowedValues = field.allowedValues || [];
-                    fieldOptions[fieldId] = allowedValues.map((v: any) => v.name || v.value || v.label || String(v.id));
-                }
-            }
-        }
-
-        res.json({ success: true, fieldOptions });
-    } catch (error: any) {
-        // Fallback: try fetching individual field options
-        console.error('Createmeta error, trying individual field fetch:', error.response?.status);
-
-        try {
-            for (const fieldId of fieldIds) {
-                try {
-                    const contextResp = await axios.get(
-                        `${config.jira.url}/rest/api/3/field/${fieldId}/context`,
-                        { headers }
-                    );
-                    const contextId = contextResp.data?.values?.[0]?.id;
-                    if (contextId) {
-                        const optResp = await axios.get(
-                            `${config.jira.url}/rest/api/3/field/${fieldId}/context/${contextId}/option`,
-                            { headers }
-                        );
-                        fieldOptions[fieldId] = (optResp.data?.values || []).map((v: any) => v.value || v.name || String(v.id));
-                    }
-                } catch {
-                    // Field may not have options or be inaccessible
-                }
-            }
-            res.json({ success: true, fieldOptions });
-        } catch (fallbackError: any) {
-            res.status(500).json({ success: false, message: 'Failed to fetch field options', fieldOptions });
-        }
-    }
-});
-
-// GET /api/dynamic-options — fetch assignees, recent issues, and cascading module options
-app.get('/api/dynamic-options', async (_req: Request, res: Response) => {
-    const config = loadConfig();
-    if (!config.jira.url || !config.jira.apiKey || !config.jira.email || !config.jira.project) {
+// POST /api/dynamic-options — fetch assignees, recent issues, and cascading module options
+app.post('/api/dynamic-options', async (req: Request, res: Response) => {
+    const config = req.body.config;
+    if (!config?.jira?.url || !config?.jira?.apiKey || !config?.jira?.email || !config?.jira?.project) {
         res.status(400).json({ success: false, message: 'Jira settings incomplete' });
         return;
     }
@@ -481,13 +304,13 @@ app.get('/api/dynamic-options', async (_req: Request, res: Response) => {
 
 // POST /api/push-to-jira — create Jira issue from bug report
 app.post('/api/push-to-jira', async (req: Request, res: Response) => {
-    const config = loadConfig();
-    if (!config.jira.url || !config.jira.apiKey || !config.jira.email || !config.jira.project) {
+    const { bugReport, config } = req.body;
+
+    if (!config?.jira?.url || !config?.jira?.apiKey || !config?.jira?.email || !config?.jira?.project) {
         res.status(400).json({ success: false, message: 'Jira settings are incomplete. Please update Settings.' });
         return;
     }
 
-    const { bugReport } = req.body;
     if (!bugReport) {
         res.status(400).json({ success: false, message: 'No bug report data provided' });
         return;
@@ -649,7 +472,12 @@ app.post('/api/push-to-jira', async (req: Request, res: Response) => {
     }
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`🐛 Bug Report Enhancer running at http://localhost:${PORT}`);
-});
+// Start server for local development
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`🐛 Bug Report Enhancer running at http://localhost:${PORT}`);
+    });
+}
+
+// Export the Express API for Vercel serverless
+export default app;

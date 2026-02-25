@@ -4,7 +4,7 @@
   "description": "AI-powered bug report enhancer with Jira integration",
   "main": "server.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "npx tsc --outDir public --target ES2020 --module ES2020 --moduleResolution node --skipLibCheck --lib ES2020,DOM public/app.ts",
     "start": "ts-node server.ts",
     "dev": "ts-node server.ts"
   },
